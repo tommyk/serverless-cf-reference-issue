@@ -1,0 +1,60 @@
+service: serverless-cf-reference-issue
+
+provider:
+  name: aws
+  runtime: nodejs12.x
+  region: us-east-2
+
+functions:
+  hello:
+    handler: handler.hello
+    events:
+      - http:
+          path: hello
+          method: get
+          cors: true
+          authorizer:
+            arn: ${cf:${self:service}-${self:provider.stage}.UserPoolArn}
+            scopes:
+              - email
+
+resources:
+  Resources:
+    CognitoUserPool:
+      Type: AWS::Cognito::UserPool
+      Properties:
+        UserPoolName: "serverless-cf-reference-issue"
+        UsernameAttributes:
+          - email
+        AdminCreateUserConfig:
+          AllowAdminCreateUserOnly: true
+        Policies:
+          PasswordPolicy:
+            MinimumLength: 10
+            RequireLowercase: True
+            RequireNumbers: True
+            RequireSymbols: False
+            RequireUppercase: True
+            TemporaryPasswordValidityDays: 2
+    CognitoUserPoolClient:
+      Type: AWS::Cognito::UserPoolClient
+      Properties:
+        ClientName: user-pool-client-app
+        GenerateSecret: False
+        AllowedOAuthFlows:
+          - code
+          - implicit
+        AllowedOAuthScopes:
+          - email
+          - openid
+        CallbackURLs:
+          - http://localhost:9000
+        SupportedIdentityProviders:
+          - COGNITO
+        AllowedOAuthFlowsUserPoolClient: true
+        UserPoolId:
+          Ref: CognitoUserPool
+  Outputs:
+    UserPoolArn:
+      Description: The ARN for the cognito user pool
+      Value: !GetAtt CognitoUserPool.Arn
